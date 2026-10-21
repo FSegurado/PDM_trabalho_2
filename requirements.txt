@@ -1,0 +1,9 @@
+# pipeline de streaming (Dataflow) e testes locais
+apache-beam[gcp]==2.70.0
+
+# produtor (publica no Pub/Sub)
+google-cloud-pubsub>=2.21
+pandas>=2.0
+
+# testes
+pytest>=8.0
