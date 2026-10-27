@@ -7,3 +7,13 @@ pandas>=2.0
 
 # testes
 pytest>=8.0
+
+# empacotamento do módulo comum para o Dataflow (Python 3.12+ não traz no venv)
+setuptools
+wheel
+build
+
+# empacotamento do módulo comum para o Dataflow (Python 3.12+ não traz no venv)
+setuptools
+wheel
+build
