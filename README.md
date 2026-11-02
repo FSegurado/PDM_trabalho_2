@@ -57,8 +57,8 @@ bash infra/02_run_pipeline.sh
 
 # 3) liga o produtor com o CSV do crawler (publica só 2026-27)
 bash infra/04_run_producer.sh players_stats_final.csv
-#    demo: mais rápido, em loop e com 1 evento quebrado a cada 40 para mostrar o dead-letter
-bash infra/04_run_producer.sh players_stats_final.csv --delay 0.3 --loop --bad-every 40
+#    demo: mais rápido e em loop
+bash infra/04_run_producer.sh players_stats_final.csv --delay 0.3 --loop
 
 # 4) acompanhe: console do Dataflow (grafo com contadores) + sql/03_demo_queries.sql no BigQuery
 
@@ -78,7 +78,7 @@ python -m pytest -q                                   # 19 testes: regras + graf
 
 # gera mensagens a partir do CSV real e roda o pipeline inteiro na máquina
 python producer/publisher.py --cache players_stats_final.csv --only-season 2627 \
-       --dry-run mensagens.jsonl --bad-every 100
+       --dry-run mensagens.jsonl
 python pipeline/streaming_pipeline.py --input_file mensagens.jsonl --output_dir saida_local
 # saida_local/bronze_raw.jsonl · silver.jsonl · errors.jsonl
 ```
@@ -87,7 +87,7 @@ python pipeline/streaming_pipeline.py --input_file mensagens.jsonl --output_dir 
 
 - **Dataflow faz o que é por evento; a view faz o que junta linhas.** Transferências, por 90 e corte de minutos dependem de várias mensagens do mesmo jogador. Por isso ficam numa view, que aplica as regras da Silver do T1 sobre a última coleta. Conferido no CSV real: para 2025-26, a view devolve exatamente os mesmos 1.597 jogadores e clubes principais que a lógica pandas do T1.
 - **Bruto e tratado gravados juntos.** O evento original vai para a Bronze antes de qualquer transformação. Se uma regra mudar, dá para reprocessar.
-- **Dead-letter em tabela.** JSON quebrado, campo obrigatório vazio, texto em campo numérico, valor negativo ou temporada inválida não derrubam o job. Vão para `bronze.player_stats_stream_errors` com a etapa e o motivo. Linhas que o BigQuery recusar também vão para lá.
+- **Dead-letter em tabela.** JSON quebrado, campo obrigatório vazio, texto em campo numérico, valor negativo ou temporada inválida não derrubam o job. Vão para `bronze.player_stats_stream_errors` com a etapa e o motivo. Linhas que o BigQuery recusar também vão para lá. O produtor não injeta erros: só aparecem na tabela os problemas que vierem de fato do crawler.
 - **Deduplicação em duas camadas.** O Pub/Sub entrega "pelo menos uma vez" e o produtor em loop reenvia tudo. O Dataflow descarta repetições idênticas dentro de uma janela de 1 dia (estado por chave de conteúdo). A view ainda escolhe só a última coleta de cada jogador e clube.
 - **Particionamento por dia de ingestão e clusterização por liga e jogador.** As consultas da demo filtram "hoje" e agrupam por jogador. Compare os bytes processados na consulta 8 do `03_demo_queries.sql`.
 - **Gravação via streaming inserts.** A linha fica consultável em segundos e não depende de Java no Cloud Shell, ao contrário da Storage Write API no Python.

@@ -8,8 +8,8 @@ Exemplos:
     # publica só a temporada em andamento, 1 jogador a cada 0,5 s
     python producer/publisher.py --cache players_stats_final.csv --only-season 2627
 
-    # demo: repete o cache em loop e injeta 1 evento quebrado a cada 40 (para mostrar o dead-letter)
-    python producer/publisher.py --cache players_stats_final.csv --only-season 2627 --loop --bad-every 40
+    # demo: repete o cache em loop
+    python producer/publisher.py --cache players_stats_final.csv --only-season 2627 --loop
 
     # sem GCP: gera um arquivo JSONL com as mesmas mensagens (para o teste local do pipeline)
     python producer/publisher.py --cache players_stats_final.csv --only-season 2627 --dry-run mensagens.jsonl
@@ -54,13 +54,6 @@ def build_event(row: dict, snapshot_date: str) -> dict:
     }
 
 
-def broken_event() -> bytes:
-    """Evento propositalmente inválido, para demonstrar o dead-letter na apresentação."""
-    return json.dumps({"event_id": str(uuid.uuid4()), "payload": {
-        "league": "ESP-La Liga", "season": "2627", "team": "Demo FC",
-        "player": "Evento Quebrado", "Playing Time_Min": "noventa"}}).encode("utf-8")
-
-
 def main() -> None:
     ap = argparse.ArgumentParser(description="Replay do cache do crawler FBref para o Pub/Sub")
     ap.add_argument("--cache", required=True, help="CSV gerado pelo crawler")
@@ -69,7 +62,6 @@ def main() -> None:
     ap.add_argument("--delay", type=float, default=0.5, help="Segundos entre eventos")
     ap.add_argument("--limit", type=int, help="Publica no máximo N eventos por passada")
     ap.add_argument("--loop", action="store_true", help="Republica o cache indefinidamente")
-    ap.add_argument("--bad-every", type=int, default=0, help="Demo: injeta 1 evento inválido a cada N")
     ap.add_argument("--project", help="Projeto GCP (padrão: detectado automaticamente)")
     ap.add_argument("--topic", default=TOPIC_ID)
     ap.add_argument("--dry-run", metavar="ARQUIVO.jsonl", help="Não publica: grava as mensagens em arquivo")
@@ -91,9 +83,6 @@ def main() -> None:
                 out.write(json.dumps({"data": data, "message_id": f"local-{i}",
                                       "attributes": {"season": str(row.get("season", ""))}},
                                      ensure_ascii=False) + "\n")
-                if args.bad_every and i % args.bad_every == 0:
-                    out.write(json.dumps({"data": broken_event().decode(), "message_id": f"local-bad-{i}",
-                                          "attributes": {}}) + "\n")
         print(f"[dry-run] {len(rows)} mensagens gravadas em {args.dry_run}")
         return
 
@@ -119,9 +108,6 @@ def main() -> None:
                                         source=SOURCE, schema_version=SCHEMA_VERSION)
                 fut.add_done_callback(lambda f, lb=row.get("player"): report(f, lb))
                 print(f"[Pub/Sub] #{passada}.{i} {row.get('player', '?')} ({row.get('team', '?')})")
-                if args.bad_every and i % args.bad_every == 0:
-                    publisher.publish(topic_path, data=broken_event(), source="demo-dead-letter")
-                    print("[Pub/Sub] evento inválido injetado (demo do dead-letter)")
                 time.sleep(args.delay)
             if not args.loop:
                 break
