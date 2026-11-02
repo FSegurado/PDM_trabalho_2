@@ -39,10 +39,10 @@ bash infra/02_run_pipeline.sh
 ### 1. Ligar o produtor (no terminal)
 
 ```bash
-bash infra/04_run_producer.sh players_stats_final.csv --delay 0.3 --bad-every 40
+bash infra/04_run_producer.sh players_stats_final.csv --delay 0.3 --loop
 ```
 
-Mostre as linhas `[Pub/Sub]` passando e o "evento inválido injetado".
+Mostre as linhas `[Pub/Sub]` passando.
 
 ### 2. Mostrar o grafo do Dataflow
 
@@ -56,7 +56,7 @@ Consultas do arquivo `sql/03_demo_queries.sql`, nesta ordem:
 |---|---|
 | 1 | Os eventos chegam minuto a minuto. Rode duas vezes e o número cresce. |
 | 3 | Funil: bruto → tratado → rejeitado. |
-| 4 | Dead-letter: o evento quebrado com a etapa e o motivo. O job não cai. |
+| 4 | Dead-letter: só tem linha se o crawler mandou algo inválido de verdade. Se vier vazia, diga que a validação está ativa e nada foi rejeitado. Os casos de erro estão cobertos nos testes (`tests/`). |
 | 2 | Latência de poucos segundos entre o Pub/Sub e a Silver. |
 | 7 | **Batch + streaming lado a lado** na view híbrida (o ponto principal). |
 | 6 | Corte de minutos proporcional por liga (se der tempo). |

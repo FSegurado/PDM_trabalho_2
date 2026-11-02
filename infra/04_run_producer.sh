@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Liga o produtor publicando a temporada em andamento (2026-27) no Pub/Sub.
 # Uso:  bash infra/04_run_producer.sh players_stats_final.csv [opções extras do publisher.py]
-# Ex.:  bash infra/04_run_producer.sh players_stats_final.csv --delay 0.3 --bad-every 40
+# Ex.:  bash infra/04_run_producer.sh players_stats_final.csv --delay 0.3 --loop
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source infra/00_config.sh
