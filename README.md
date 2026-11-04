@@ -4,7 +4,7 @@ Evolução do Trabalho 1 (pipeline batch Medallion no BigQuery) para uma arquite
 
 | | |
 |---|---|
-| **API no Cloud Run** | `<URL da API>` (veja [Chamar a API](#7-chamar-a-api)) |
+| **API no Cloud Run** | `https://ballon-dor-api-ybq5jz4ria-uc.a.run.app/` (veja [Chamar a API](#7-chamar-a-api)) |
 | **Acesso do professor** | `savioteles@ufg.br` tem o papel **Cloud Run Invoker** na API (veja [Chamar a API](#7-chamar-a-api)) |
 | **Projeto GCP** | `trabalho-pdm-joao-fut` · Dataflow, Cloud Run e Vertex AI em `us-central1` · BigQuery em `US` |
 | **Roteiro de teste/demo** | [`roteiro_demo_streaming.md`](roteiro_demo_streaming.md) |
