@@ -38,6 +38,12 @@ from producer.publisher import SCHEMA_VERSION, SOURCE, build_event  # noqa: E402
 RENAME_ID_COLUMNS = {"nation": "nation_", "pos": "pos_", "age": "age_", "born": "born_"}
 
 
+def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """nation/pos/age/born -> nation_/pos_/age_/born_ (só quando a versão com "_" não existe)."""
+    return df.rename(columns={k: v for k, v in RENAME_ID_COLUMNS.items()
+                              if k in df.columns and v not in df.columns})
+
+
 def load_snapshot(bucket_name: str, blob_name: str) -> tuple[pd.DataFrame, str]:
     blob = storage.Client().bucket(bucket_name).get_blob(blob_name)
     if blob is None:
@@ -61,7 +67,7 @@ def main() -> None:
 
     blob_name = f"{prefix}players_stats_{season}.csv"
     df, snapshot = load_snapshot(bucket, blob_name)
-    df = df.rename(columns={k: v for k, v in RENAME_ID_COLUMNS.items() if k in df.columns and v not in df.columns})
+    df = normalize_columns(df)
     df = df[df["season"].astype(str).str.strip() == season]
     if limit:
         df = df.head(limit)

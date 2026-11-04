@@ -42,6 +42,10 @@ bind "${SA_API}" roles/storage.objectViewer
 bind "${SA_SCHED}" roles/run.invoker
 
 echo "== 4/7 Vertex AI Model Registry (sem endpoint: não cobra por hora)"
+if ! gcloud storage ls "${MODEL_GCS}/model/model.bst" >/dev/null 2>&1; then
+  echo "   exportando o modelo do BigQuery (sql/08_export_modelo.sql)"
+  bq --location "${BQ_LOCATION}" --project_id "${PROJECT_ID}" query --use_legacy_sql=false < sql/08_export_modelo.sql
+fi
 if [[ -z "$(gcloud ai models list --region "${REGION}" --filter "displayName=${MODEL_NAME}" --format 'value(name)' 2>/dev/null)" ]]; then
   gcloud ai models upload --region "${REGION}" --display-name "${MODEL_NAME}" \
     --artifact-uri "${MODEL_GCS}/model/" \

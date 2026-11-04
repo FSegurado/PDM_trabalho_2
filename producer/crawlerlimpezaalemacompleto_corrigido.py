@@ -1,6 +1,8 @@
 import pandas as pd
 import soccerdata as sd
 
+CHAVES = {"league", "season", "team", "player"}
+
 def extrair_e_limpar_fbref(seasons=["2627"], output_path="players_stats_final.csv"):
     # 1. Extrair dados via soccerdata (mantém o processo oculto de navegação)
     print(f"[*] A extrair dados da(s) temporada(s) {seasons}...")
@@ -15,8 +17,10 @@ def extrair_e_limpar_fbref(seasons=["2627"], output_path="players_stats_final.cs
         if isinstance(col, tuple):
             grupo, metrica = col[0].strip(), str(col[1]).strip()
             if metrica == "":
-                # chaves (league, season, team, player): sem sufixo
-                novas_colunas.append(grupo)
+                # chaves (league, season, team, player): sem sufixo. Versões novas do soccerdata
+                # também trazem nation/pos/age/born assim, ("nation", ""): esses levam o "_"
+                # que o pipeline espera (sem ele, nation_/pos_/age_/born_ chegavam nulos).
+                novas_colunas.append(grupo if grupo in CHAVES else f"{grupo}_")
             elif grupo == "" or grupo.startswith("Unnamed"):
                 # colunas sem grupo (nation, pos, age, born, ...): sufixo "_" para
                 # bater com o esquema usado pelo resto do pipeline (ballon_common/

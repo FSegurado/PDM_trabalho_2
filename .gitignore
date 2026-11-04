@@ -5,3 +5,5 @@ __pycache__/
 saida_local/
 mensagens*.jsonl
 *.csv
+# pasta temporária criada pelo soccerdata/seleniumbase ao rodar o crawler
+downloaded_files/

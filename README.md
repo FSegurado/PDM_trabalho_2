@@ -134,9 +134,22 @@ BigQuery gold.model_btree_ballon_dor ─EXPORT MODEL─► gs://futdados/models/
 | `job/` | Cloud Run Job: lê o snapshot do crawler no GCS, corrige os nomes `nation/pos/age/born` → `nation_/pos_/age_/born_` e publica 1 evento por jogador (mesmo envelope do `publisher.py`). |
 | `api/main.py` | API FastAPI. Na subida, busca o modelo no Vertex AI Model Registry e baixa o artefato. Aplica o z-score por temporada da Gold e o encoding/imputação do BQML (NULL numérico → média do treino; categoria NULL → `_null_filler`). |
 | `api/validate.py` | Compara a API com o `ML.PREDICT` do BigQuery na amostra de referência exportada. |
+| `sql/05_batch_2526.sql` | Batch 2025-26: CSV do crawler → `bronze.players_stats_2526_raw` → `silver.player_season` (regras do T1), mais o resultado real do Ballon d'Or 2026. |
+| `sql/06_gold_hibrida.sql` | Procedure `gold.sp_ranking_parcial_2027`: refaz a Gold a partir da Silver híbrida (z-score por temporada) e gera `gold.ranking_parcial_2027`. |
+| `sql/07_top30_2026.sql` | `gold.predictions_2526`, `gold.top30_2026` (vs. 30 indicados reais), `gold.indicados_2026_vs_previsto` e `gold.top3_2026_congelado`. |
+| `sql/08_export_modelo.sql` | `EXPORT MODEL` para o GCS + estatísticas do z-score e amostra de referência para a API. |
 | `infra/05_deploy_partes_3_4.sh` | APIs, contas de serviço (mínimo necessário), registro no Vertex AI, builds, job, agendamento e API. |
 
 **Por que o crawler não roda no Cloud Run Job:** o leitor do FBref no `soccerdata` usa um navegador que contorna a proteção anti-bot do site. Isso não é apropriado (nem confiável) a partir de IPs de nuvem. O crawler roda fora e grava o snapshot em `gs://futdados/cache/`; o job agendado faz o replay para o Pub/Sub.
+
+**Atualizar o snapshot do produtor** (depois de rodar o crawler na sua máquina):
+
+```bash
+gcloud storage cp players_stats_final.csv gs://futdados/cache/players_stats_2627.csv \
+  --custom-metadata=snapshot_date=$(date +%F)
+```
+
+**Ordem para reproduzir do zero:** `sql/05` → `sql/06` → `sql/07` → `sql/08` → `bash infra/05_deploy_partes_3_4.sh`.
 
 **Validação (03/11/2026):** 45 jogadores de 2023-24, 2025-26 e 2026-27 — maior diferença entre a API e o `ML.PREDICT` = 0,00005.
 
