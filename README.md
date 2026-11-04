@@ -110,3 +110,43 @@ python pipeline/streaming_pipeline.py --input_file mensagens.jsonl --output_dir 
 ## Custos
 
 O job usa 1 worker `e2-standard-2` com Streaming Engine e cobra por hora enquanto estiver ligado, mesmo sem mensagens. Pub/Sub, streaming inserts e BigQuery custam centavos neste volume (~2 mil eventos por varredura). Ligue o job só para testar e para a apresentação, e rode `infra/03_drain.sh` ao terminar.
+
+---
+
+# Partes 3 e 4: produtor agendado, Vertex AI e API REST
+
+```
+Crawler FBref (fora da nuvem) ─► gs://futdados/cache/players_stats_2627.csv
+                                        │
+Cloud Scheduler (06:17, diário) ─► Cloud Run Job producer-fbref ─► Pub/Sub ─► Dataflow (parte 2)
+
+BigQuery gold.model_btree_ballon_dor ─EXPORT MODEL─► gs://futdados/models/ballon_dor_btree/v1/
+                                                         ├─ model/          (XGBoost + assets do BQML)
+                                                         └─ preprocessing/  (média/desvio por temporada)
+                                        │
+                     Vertex AI Model Registry: ballon-dor-btree (sem endpoint)
+                                        │
+                     Cloud Run ballon-dor-api (privada, IAM) ─ POST /predict → JSON
+```
+
+| Pasta / arquivo | O que faz |
+|---|---|
+| `job/` | Cloud Run Job: lê o snapshot do crawler no GCS, corrige os nomes `nation/pos/age/born` → `nation_/pos_/age_/born_` e publica 1 evento por jogador (mesmo envelope do `publisher.py`). |
+| `api/main.py` | API FastAPI. Na subida, busca o modelo no Vertex AI Model Registry e baixa o artefato. Aplica o z-score por temporada da Gold e o encoding/imputação do BQML (NULL numérico → média do treino; categoria NULL → `_null_filler`). |
+| `api/validate.py` | Compara a API com o `ML.PREDICT` do BigQuery na amostra de referência exportada. |
+| `infra/05_deploy_partes_3_4.sh` | APIs, contas de serviço (mínimo necessário), registro no Vertex AI, builds, job, agendamento e API. |
+
+**Por que o crawler não roda no Cloud Run Job:** o leitor do FBref no `soccerdata` usa um navegador que contorna a proteção anti-bot do site. Isso não é apropriado (nem confiável) a partir de IPs de nuvem. O crawler roda fora e grava o snapshot em `gs://futdados/cache/`; o job agendado faz o replay para o Pub/Sub.
+
+**Validação (03/11/2026):** 45 jogadores de 2023-24, 2025-26 e 2026-27 — maior diferença entre a API e o `ML.PREDICT` = 0,00005.
+
+```bash
+URL=$(gcloud run services describe ballon-dor-api --region us-central1 --format 'value(status.url)')
+TOKEN=$(gcloud config config-helper --force-auth-refresh --format='value(credential.id_token)')
+curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" "$URL/predict" \
+  -d '{"instances":[{"season":2526,"league":"ENG-Premier League","pos_primary":"FW","minutes":2900,"age":25,"goals_per90":0.95,"assists_per90":0.15}]}'
+python3 api/validate.py "$URL"
+gcloud run jobs execute producer-fbref --region us-central1
+```
+
+Lembrete: o job publica no Pub/Sub mesmo com o Dataflow desligado, mas as mensagens só ficam 1 dia na subscription. Para elas chegarem ao BigQuery, ligue o pipeline (`infra/02_run_pipeline.sh`) antes ou logo depois do job.
