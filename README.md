@@ -138,7 +138,7 @@ gcloud config set project trabalho-pdm-joao-fut
 
 > **Projeto e bucket.** Os scripts de `infra/`, o pipeline, o produtor e o `sql/01` a `04` usam o projeto ativo do `gcloud`, sem ID fixo. Já o `sql/05` a `08`, o `api/validate.py` e o `infra/05_deploy_partes_3_4.sh` citam `trabalho-pdm-joao-fut` e `gs://futdados`, que são os do T1. Em outro projeto, crie um bucket e troque os dois nomes antes de rodar:
 > ```bash
-> sed -i 's/trabalho-pdm-joao-fut/NOVO_PROJETO/g; s#gs://futdados#gs://NOVO_BUCKET#g' \
+> sed -i 's/trabalho-pdm-joao-fut/NOVO_PROJETO/g; s#gs://futdados#gs://NOVO_BUCKET#g; s/CACHE_BUCKET=futdados/CACHE_BUCKET=NOVO_BUCKET/' \
 >   sql/0[5-8]_*.sql api/validate.py infra/05_deploy_partes_3_4.sh
 > ```
 
