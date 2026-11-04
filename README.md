@@ -5,6 +5,7 @@ Evolução do Trabalho 1 (pipeline batch Medallion no BigQuery) para uma arquite
 | | |
 |---|---|
 | **API no Cloud Run** | `<URL da API>` (veja [Chamar a API](#7-chamar-a-api)) |
+| **Acesso do professor** | `savioteles@ufg.br` tem o papel **Cloud Run Invoker** na API (veja [Chamar a API](#7-chamar-a-api)) |
 | **Projeto GCP** | `trabalho-pdm-joao-fut` · Dataflow, Cloud Run e Vertex AI em `us-central1` · BigQuery em `US` |
 | **Roteiro de teste/demo** | [`roteiro_demo_streaming.md`](roteiro_demo_streaming.md) |
 
@@ -222,6 +223,12 @@ gcloud dataflow jobs list --region us-central1 --status active   # até "Listed 
 ## 7. Chamar a API
 
 A API é **privada**: só responde a quem tem o papel `roles/run.invoker` no serviço. A chamada leva um token de identidade do Google.
+
+> **Professor:** o e-mail `savioteles@ufg.br` já tem o papel **Cloud Run Invoker** (`roles/run.invoker`) na `ballon-dor-api`. Para chamar a API:
+> 1. Instale o [Google Cloud CLI](https://cloud.google.com/sdk/docs/install) (ou use o Cloud Shell) e entre com essa conta: `gcloud auth login savioteles@ufg.br`
+> 2. Rode os comandos abaixo, trocando `$URL` pela URL da API no topo deste README.
+>
+> Sem o token, a API responde **403 Forbidden**, e isso é esperado. O token vale 1 hora; gere outro com `gcloud auth print-identity-token`.
 
 ```bash
 URL=$(gcloud run services describe ballon-dor-api --region us-central1 --format 'value(status.url)')
