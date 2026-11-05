@@ -38,7 +38,7 @@ BigQuery (views, mesmas regras da Silver do T1)     ▼
 | `sql/04_hybrid_view.sql` | View híbrida batch + streaming (precisa da Silver do T1 no projeto). |
 | `infra/*.sh` | Scripts para o Cloud Shell: setup, subir job, ligar produtor, desligar job. |
 | `tests/` | Testes das regras e do grafo do Beam (rodam sem GCP). |
-| `notebooks_t1/` | Notebooks de ingestão e Silver do T1 com o ID do projeto automático. |
+| `notebooks_t1/` | Notebooks do T1 (ingestão, Silver e Gold/treino do modelo) com o ID do projeto automático. |
 
 ## Passo a passo no Cloud Shell
 
@@ -102,10 +102,12 @@ python pipeline/streaming_pipeline.py --input_file mensagens.jsonl --output_dir 
 
 ## Notebooks do T1 com projeto automático
 
-`notebooks_t1/` tem a ingestão e a Silver com uma célula nova no topo (`get_project_id()`). Todos os `"trabalho-pdm-joao-fut"` foram trocados por `PROJECT_ID`. No BigQuery Studio o projeto é detectado sozinho. Em outro ambiente, defina antes `os.environ["GOOGLE_CLOUD_PROJECT"] = "seu-projeto"`.
+`notebooks_t1/` tem os três notebooks do T1, na ordem de execução: `ingerindobronzev2` (Bronze), `silver_ballon_dor` (Silver) e `gold_ballon_dor` (Gold, `CREATE MODEL` e avaliação). Cada um tem uma célula nova no topo (`get_project_id()`), e os `"trabalho-pdm-joao-fut"` do código foram trocados por `PROJECT_ID`. No BigQuery Studio o projeto é detectado sozinho. Em outro ambiente, defina antes `os.environ["GOOGLE_CLOUD_PROJECT"] = "seu-projeto"`.
 
 - Na ingestão, o bucket `futdados` continua fixo, porque nome de bucket é global. Num projeto novo, crie um bucket e troque `BUCKET_NAME`.
-- No notebook da Gold, faça a mesma troca na primeira célula: cole a célula do `get_project_id()` (copie do notebook da Silver) e mude `PROJECT = "trabalho-pdm-joao-fut"` para `PROJECT = PROJECT_ID`.
+- O notebook da Gold é o que cria `gold.model_btree_ballon_dor`, usado pelo resto do pipeline. No apêndice em SQL puro (§14), troque `SEU_PROJETO` pelo ID do projeto.
+- As saídas das células são as da execução original no projeto `trabalho-pdm-joao-fut`.
+- No T2, a Gold é refeita por `sql/06_gold_hibrida.sql` (mesma query, lendo a Silver híbrida). O modelo não é retreinado.
 
 ## Custos
 
@@ -149,7 +151,7 @@ gcloud storage cp players_stats_final.csv gs://futdados/cache/players_stats_2627
   --custom-metadata=snapshot_date=$(date +%F)
 ```
 
-**Ordem para reproduzir do zero:** `sql/05` → `sql/06` → `sql/07` → `sql/08` → `bash infra/05_deploy_partes_3_4.sh`.
+**Ordem para reproduzir do zero:** notebooks do T1 (`notebooks_t1/`: Bronze → Silver → Gold) → parte 2 (`infra/01_setup.sh`) → `sql/05` → `sql/06` → `sql/07` → `sql/08` → `bash infra/05_deploy_partes_3_4.sh`.
 
 **Validação (03/11/2026):** 45 jogadores de 2023-24, 2025-26 e 2026-27 — maior diferença entre a API e o `ML.PREDICT` = 0,00005.
 
