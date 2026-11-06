@@ -4,7 +4,9 @@ Evolução do Trabalho 1 (pipeline batch Medallion no BigQuery) para uma arquite
 
 | | |
 |---|---|
-<<<<<<< HEAD
+| **API no Cloud Run** | `https://ballon-dor-api-ybq5jz4ria-uc.a.run.app/` (veja [Chamar a API](#7-chamar-a-api)) |
+| **Projeto GCP** | `trabalho-pdm-joao-fut` · Dataflow, Cloud Run e Vertex AI em `us-central1` · BigQuery em `US` |
+| **Roteiro de teste/demo** | [`roteiro_demo_streaming.md`](roteiro_demo_streaming.md) |
 | `ballon_common/preprocessing.py` | Regras linha a linha da Silver do T1 (tipagem, nomes, chaves). É o **módulo comum** usado pelo Dataflow e, depois, pela API. |
 | `ballon_common/gcp.py` | `get_project_id()`: descobre o projeto GCP sozinho. Nenhum ID fixo no código. |
 | `pipeline/streaming_pipeline.py` | O job Beam. Roda no Dataflow ou localmente com um arquivo de teste. |
@@ -16,12 +18,6 @@ Evolução do Trabalho 1 (pipeline batch Medallion no BigQuery) para uma arquite
 | `infra/*.sh` | Scripts para o Cloud Shell: setup, subir job, ligar produtor, desligar job. |
 | `tests/` | Testes das regras e do grafo do Beam (rodam sem GCP). |
 | `notebooks_t1/` | Notebooks do T1 (ingestão, Silver e Gold/treino do modelo) com o ID do projeto automático. |
-=======
-| **API no Cloud Run** | `https://ballon-dor-api-ybq5jz4ria-uc.a.run.app/` (veja [Chamar a API](#7-chamar-a-api)) |
-| **Acesso do professor** | `savioteles@ufg.br` tem o papel **Cloud Run Invoker** na API (veja [Chamar a API](#7-chamar-a-api)) |
-| **Projeto GCP** | `trabalho-pdm-joao-fut` · Dataflow, Cloud Run e Vertex AI em `us-central1` · BigQuery em `US` |
-| **Roteiro de teste/demo** | [`roteiro_demo_streaming.md`](roteiro_demo_streaming.md) |
->>>>>>> 98ac18b5c1b127bee52e064537c043c78774dbcc
 
 ---
 
@@ -238,8 +234,8 @@ gcloud dataflow jobs list --region us-central1 --status active   # até "Listed 
 
 A API é **privada**: só responde a quem tem o papel `roles/run.invoker` no serviço. A chamada leva um token de identidade do Google.
 
-> **Professor:** o e-mail `savioteles@ufg.br` já tem o papel **Cloud Run Invoker** (`roles/run.invoker`) na `ballon-dor-api`. Para chamar a API:
-> 1. Instale o [Google Cloud CLI](https://cloud.google.com/sdk/docs/install) (ou use o Cloud Shell) e entre com essa conta: `gcloud auth login savioteles@ufg.br`
+> Para chamar a API:
+> 1. Instale o [Google Cloud CLI](https://cloud.google.com/sdk/docs/install) (ou use o Cloud Shell) e entre com uma conta que tenha o papel `roles/run.invoker` na `ballon-dor-api` (veja como conceder abaixo).
 > 2. Rode os comandos abaixo, trocando `$URL` pela URL da API no topo deste README.
 >
 > Sem o token, a API responde **403 Forbidden**, e isso é esperado. O token vale 1 hora; gere outro com `gcloud auth print-identity-token`.
@@ -298,39 +294,7 @@ python pipeline/streaming_pipeline.py --input_file mensagens.jsonl --output_dir 
 # saida_local/bronze_raw.jsonl · silver.jsonl · errors.jsonl
 ```
 
-<<<<<<< HEAD
-## Decisões técnicas (para a apresentação)
-
-- **Dataflow faz o que é por evento; a view faz o que junta linhas.** Transferências, por 90 e corte de minutos dependem de várias mensagens do mesmo jogador. Por isso ficam numa view, que aplica as regras da Silver do T1 sobre a última coleta. Conferido no CSV real: para 2025-26, a view devolve exatamente os mesmos 1.597 jogadores e clubes principais que a lógica pandas do T1.
-- **Bruto e tratado gravados juntos.** O evento original vai para a Bronze antes de qualquer transformação. Se uma regra mudar, dá para reprocessar.
-- **Dead-letter em tabela.** JSON quebrado, campo obrigatório vazio, texto em campo numérico, valor negativo ou temporada inválida não derrubam o job. Vão para `bronze.player_stats_stream_errors` com a etapa e o motivo. Linhas que o BigQuery recusar também vão para lá. O produtor não injeta erros: só aparecem na tabela os problemas que vierem de fato do crawler.
-- **Deduplicação em duas camadas.** O Pub/Sub entrega "pelo menos uma vez" e o produtor em loop reenvia tudo. O Dataflow descarta repetições idênticas dentro de uma janela de 1 dia (estado por chave de conteúdo). A view ainda escolhe só a última coleta de cada jogador e clube.
-- **Particionamento por dia de ingestão e clusterização por liga e jogador.** As consultas da demo filtram "hoje" e agrupam por jogador. Compare os bytes processados na consulta 8 do `03_demo_queries.sql`.
-- **Gravação via streaming inserts.** A linha fica consultável em segundos e não depende de Java no Cloud Shell, ao contrário da Storage Write API no Python.
-- **Corte de minutos proporcional.** O T1 usa 900 min na temporada inteira. No streaming o corte vira `900 × rodadas jogadas ÷ rodadas totais da liga` (38, ou 34 na Bundesliga e na Ligue 1). Com a temporada completa, ele volta a ser 900.
-
-## Limitações conhecidas (leia antes de ligar ao modelo)
-
-1. **O crawler traz 25 colunas; o modelo do T1 usa 37 features.** O CSV do crawler tem só a tabela "standard" do FBref: minutos, gols, assistências, pênaltis e cartões. Não traz xG, chutes, passes, progressão, defesa nem `Team Success_PPM`. Na view, essas colunas existem mas ficam **nulas**. Para a parte 2 isso não atrapalha. Para prever com o modelo do T1, ~80% das features chegam vazias, e o mesmo vale para a 2025-26 se ela vier deste crawler. Há duas saídas: o crawler coletar as outras tabelas do FBref, ou treinar uma versão do modelo só com as features disponíveis nas duas fontes.
-2. **Contexto de time (passo 3) indisponível** pelo mesmo motivo (sem `Team Success_PPM`). `team_rank_proxy` e `is_*_proxy` ficam nulos.
-3. **Idade no formato "anos-dias".** Na temporada em andamento o FBref grava `29-008`. O módulo comum lê como 29. A regra antiga do T1 (`to_numeric_eu`) transformaria isso em nulo.
-4. **Arredondamento.** Em 1 de 1.597 jogadores o `goals_per90` difere na 4ª casa decimal (0,2812 no pandas vs. 0,2813 no BigQuery), porque cada um arredonda o meio de um jeito.
-
-## Notebooks do T1 com projeto automático
-
-`notebooks_t1/` tem os três notebooks do T1, na ordem de execução: `ingerindobronzev2` (Bronze), `silver_ballon_dor` (Silver) e `gold_ballon_dor` (Gold, `CREATE MODEL` e avaliação). Cada um tem uma célula nova no topo (`get_project_id()`), e os `"trabalho-pdm-joao-fut"` do código foram trocados por `PROJECT_ID`. No BigQuery Studio o projeto é detectado sozinho. Em outro ambiente, defina antes `os.environ["GOOGLE_CLOUD_PROJECT"] = "seu-projeto"`.
-
-- Na ingestão, o bucket `futdados` continua fixo, porque nome de bucket é global. Num projeto novo, crie um bucket e troque `BUCKET_NAME`.
-- O notebook da Gold é o que cria `gold.model_btree_ballon_dor`, usado pelo resto do pipeline. No apêndice em SQL puro (§14), troque `SEU_PROJETO` pelo ID do projeto.
-- As saídas das células são as da execução original no projeto `trabalho-pdm-joao-fut`.
-- No T2, a Gold é refeita por `sql/06_gold_hibrida.sql` (mesma query, lendo a Silver híbrida). O modelo não é retreinado.
-
-## Custos
-
-O job usa 1 worker `e2-standard-2` com Streaming Engine e cobra por hora enquanto estiver ligado, mesmo sem mensagens. Pub/Sub, streaming inserts e BigQuery custam centavos neste volume (~2 mil eventos por varredura). Ligue o job só para testar e para a apresentação, e rode `infra/03_drain.sh` ao terminar.
-=======
 Os testes da API e do job são pulados se `xgboost`, `fastapi` ou as bibliotecas do Google Cloud não estiverem instalados. Para incluí-los: `pip install -r api/requirements.txt -r job/requirements.txt`.
->>>>>>> 98ac18b5c1b127bee52e064537c043c78774dbcc
 
 ---
 
@@ -389,10 +353,10 @@ Os testes da API e do job são pulados se `xgboost`, `fastapi` ou as bibliotecas
 
 `notebooks_t1/` tem a ingestão e a Silver com uma célula nova no topo (`get_project_id()`), no lugar do ID fixo. No BigQuery Studio o projeto é detectado sozinho. Em outro ambiente, defina antes `os.environ["GOOGLE_CLOUD_PROJECT"] = "seu-projeto"`.
 
-<<<<<<< HEAD
-**Ordem para reproduzir do zero:** notebooks do T1 (`notebooks_t1/`: Bronze → Silver → Gold) → parte 2 (`infra/01_setup.sh`) → `sql/05` → `sql/06` → `sql/07` → `sql/08` → `bash infra/05_deploy_partes_3_4.sh`.
+- Na ingestão, o bucket `futdados` continua fixo, porque nome de bucket é global. Num projeto novo, crie um bucket e troque `BUCKET_NAME`.
+- O notebook da Gold e do treino do T1 (`gold_ballon_dor.ipynb`) cria `gold.player_season_features` e `gold.model_btree_ballon_dor`. Para rodá-lo em outro projeto, faça a mesma troca: cole a célula do `get_project_id()` e mude `PROJECT = "trabalho-pdm-joao-fut"` para `PROJECT = PROJECT_ID`.
 
-**Validação (03/11/2026):** 45 jogadores de 2023-24, 2025-26 e 2026-27 — maior diferença entre a API e o `ML.PREDICT` = 0,00005.
+**Ordem para reproduzir do zero:** notebooks do T1 (`notebooks_t1/`: Bronze → Silver → Gold) → parte 2 (`infra/01_setup.sh`) → `sql/05` → `sql/06` → `sql/07` → `sql/08` → `bash infra/05_deploy_partes_3_4.sh`.
 
 ```bash
 URL=$(gcloud run services describe ballon-dor-api --region us-central1 --format 'value(status.url)')
@@ -404,7 +368,3 @@ gcloud run jobs execute producer-fbref --region us-central1
 ```
 
 Lembrete: o job publica no Pub/Sub mesmo com o Dataflow desligado, mas as mensagens só ficam 1 dia na subscription. Para elas chegarem ao BigQuery, ligue o pipeline (`infra/02_run_pipeline.sh`) antes ou logo depois do job.
-=======
-- Na ingestão, o bucket `futdados` continua fixo, porque nome de bucket é global. Num projeto novo, crie um bucket e troque `BUCKET_NAME`.
-- O notebook da Gold e do treino do T1 (`gold_ballon_dor.ipynb`) cria `gold.player_season_features` e `gold.model_btree_ballon_dor`. Para rodá-lo em outro projeto, faça a mesma troca: cole a célula do `get_project_id()` e mude `PROJECT = "trabalho-pdm-joao-fut"` para `PROJECT = PROJECT_ID`.
->>>>>>> 98ac18b5c1b127bee52e064537c043c78774dbcc
